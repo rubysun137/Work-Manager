@@ -1,15 +1,20 @@
 package com.ruby.workmanager;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.lifecycle.ViewModelProviders;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
-import androidx.annotation.Nullable;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.RadioGroup;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.ViewModelProviders;
+import androidx.work.Data;
+import androidx.work.WorkInfo;
 
 import com.bumptech.glide.Glide;
 
@@ -37,7 +42,7 @@ public class BlurActivity extends AppCompatActivity {
         mOutputButton = findViewById(R.id.see_file_button);
         mCancelButton = findViewById(R.id.cancel_button);
 
-        // Image uri should be stored in the ViewModel; put it there then display
+        // Image uri should be stored in the ViewModel;
         Intent intent = getIntent();
         String imageUriExtra = intent.getStringExtra(Constants.KEY_IMAGE_URI);
         mViewModel.setImageUri(imageUriExtra);
@@ -47,6 +52,43 @@ public class BlurActivity extends AppCompatActivity {
 
         // Setup blur image file button
         mGoButton.setOnClickListener(view -> mViewModel.applyBlur(getBlurLevel()));
+
+        mOutputButton.setOnClickListener(view -> {
+            Uri currentUri = mViewModel.getOutputUri();
+            if(currentUri != null) {
+                Intent actionView = new Intent(Intent.ACTION_VIEW, currentUri);
+                if(actionView.resolveActivity(getPackageManager()) != null) {
+                    startActivity(actionView);
+                }
+            }
+        });
+
+        mCancelButton.setOnClickListener(view -> {
+            mViewModel.cancelWork();
+        });
+
+        //Show work status
+        mViewModel.getWorkInfo().observe(this, workInfos -> {
+            if(workInfos == null || workInfos.isEmpty()){
+                return;
+            }
+
+            WorkInfo workInfo = workInfos.get(0);
+
+            boolean finished = workInfo.getState().isFinished();
+            if(!finished){
+                showWorkInProgress();
+            }else {
+                showWorkFinished();
+                Data data = workInfo.getOutputData();
+                String outputImageUri = data.getString(Constants.KEY_IMAGE_URI);
+
+                if(!TextUtils.isEmpty(outputImageUri)) {
+                    mViewModel.setOutputUri(outputImageUri);
+                    mOutputButton.setVisibility(View.VISIBLE);
+                }
+            }
+        });
     }
 
     /**
